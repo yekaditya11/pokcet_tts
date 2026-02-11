@@ -12,6 +12,7 @@ from contextlib import asynccontextmanager
 
 import scipy.io.wavfile
 import uvicorn
+import psutil
 from fastapi import FastAPI, Form, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
@@ -111,15 +112,18 @@ async def health():
 @app.get("/system")
 async def system_info():
     """Return current system load and memory info."""
-    import psutil
-    load_1, load_5, load_15 = os.getloadavg()
-    mem = psutil.virtual_memory()
-    return {
-        "load": [round(load_1, 2), round(load_5, 2), round(load_15, 2)],
-        "memory_percent": mem.percent,
-        "memory_used_gb": round(mem.used / (1024**3), 2),
-        "cpu_count": psutil.cpu_count(),
-    }
+    try:
+        load_1, load_5, load_15 = os.getloadavg()
+        mem = psutil.virtual_memory()
+        return {
+            "load": [round(load_1, 2), round(load_5, 2), round(load_15, 2)],
+            "memory_percent": mem.percent,
+            "memory_used_gb": round(mem.used / (1024**3), 2),
+            "cpu_count": psutil.cpu_count(),
+        }
+    except Exception as e:
+        logger.error(f"Error in /system endpoint: {e}")
+        return {"error": str(e)}
 
 
 @app.post("/tts")
