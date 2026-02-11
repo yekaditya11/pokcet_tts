@@ -1,0 +1,19 @@
+version: '3.8'
+
+services:
+  tts-api:
+    build: .
+    container_name: tts-api
+    ports:
+      - "8000:8000"
+    environment:
+      - DEVICE=cpu
+      - HOST=0.0.0.0
+      - PORT=8000
+      - DEFAULT_VOICE=./homesoul.wav
+      - TEMPERATURE=0.7
+      - LSD_DECODE_STEPS=1
+      - WORKERS=4
+    restart: unless-stopped
+    volumes:
+      - .:/app

@@ -1,0 +1,9 @@
+.git
+venv
+.venv
+__pycache__
+*.pyc
+.ipynb_checkpoints
+test_output.wav
+load_test.py
+*.md
