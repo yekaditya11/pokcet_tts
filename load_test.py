@@ -8,39 +8,54 @@ import subprocess
 import requests
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-URL = "http://localhost:8000/tts"
-TOTAL_REQUESTS = 100
+URL = "http://52.146.22.216/tts"
+TOTAL_REQUESTS = 200
 CONCURRENCY = 5
 TEST_TEXTS = [
-    "Hello, this is a load test for Pocket TTS.",
-    "Testing concurrent requests on the server.",
-    "How fast can this model generate speech?",
-    "The quick brown fox jumps over the lazy dog.",
-    "Pocket TTS is designed to run efficiently on CPUs.",
+    "The development of artificial intelligence has revolutionized the way we interact with technology, enabling real-time speech generation and complex data analysis with unprecedented speed.",
+    "Artificial intelligence models like this text to speech engine are becoming increasingly efficient, allowing them to run on standard consumer hardware while maintaining extremely high quality.",
+    "When deploying high performance applications to the cloud, it is essential to monitor system resources carefully to ensure that every user receives a fast and reliable experience at all times.",
+    "Optimizing server throughput involves balancing concurrency and processing power, especially for CPU bound tasks such as audio generation and real-time streaming to multiple clients globally.",
+    "The transition from single core processing to multi-worker systems allows modern servers to handle significant bursts in traffic without compromising the responsiveness of the application.",
 ]
 
 
 def get_system_load():
-    """Get current CPU and memory usage."""
-    # CPU load averages
-    load = os.getloadavg()
-    # Memory via vm_stat
-    result = subprocess.run(["vm_stat"], capture_output=True, text=True)
-    lines = result.stdout.split("\n")
-    page_size = 16384  # Apple Silicon page size
-    free = 0
-    active = 0
-    for line in lines:
-        if "Pages free" in line:
-            free = int(line.split(":")[1].strip().rstrip(".")) * page_size
-        if "Pages active" in line:
-            active = int(line.split(":")[1].strip().rstrip(".")) * page_size
-    return {
-        "load_1m": load[0],
-        "load_5m": load[1],
-        "load_15m": load[2],
-        "mem_active_gb": active / 1e9,
-    }
+    """Get current CPU and memory usage from local or remote server."""
+    if "localhost" in URL or "127.0.0.1" in URL:
+        # Local stats (Mac)
+        load = os.getloadavg()
+        try:
+            result = subprocess.run(["vm_stat"], capture_output=True, text=True)
+            lines = result.stdout.split("\n")
+            page_size = 16384  # Apple Silicon page size
+            active = 0
+            for line in lines:
+                if "Pages active" in line:
+                    active = int(line.split(":")[1].strip().rstrip(".")) * page_size
+            return {
+                "load_1m": load[0],
+                "load_5m": load[1],
+                "load_15m": load[2],
+                "mem_active_gb": active / 1e9,
+            }
+        except:
+            return {"load_1m": load[0], "load_5m": load[1], "load_15m": load[2], "mem_active_gb": 0}
+    else:
+        # Remote stats from /system endpoint
+        try:
+            base_url = URL.rsplit("/", 1)[0]
+            resp = requests.get(f"{base_url}/system", timeout=5)
+            data = resp.json()
+            return {
+                "load_1m": data["load"][0],
+                "load_5m": data["load"][1],
+                "load_15m": data["load"][2],
+                "mem_active_gb": data["memory_used_gb"],
+            }
+        except Exception as e:
+            print(f"Warning: Could not fetch remote stats: {e}")
+            return {"load_1m": 0, "load_5m": 0, "load_15m": 0, "mem_active_gb": 0}
 
 
 def make_request(request_id):
