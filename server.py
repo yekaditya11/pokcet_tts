@@ -108,6 +108,20 @@ async def health():
     return {"status": "healthy", "device": DEVICE}
 
 
+@app.get("/system")
+async def system_info():
+    """Return current system load and memory info."""
+    import psutil
+    load_1, load_5, load_15 = os.getloadavg()
+    mem = psutil.virtual_memory()
+    return {
+        "load": [round(load_1, 2), round(load_5, 2), round(load_15, 2)],
+        "memory_percent": mem.percent,
+        "memory_used_gb": round(mem.used / (1024**3), 2),
+        "cpu_count": psutil.cpu_count(),
+    }
+
+
 @app.post("/tts")
 async def text_to_speech(text: str = Form(...)):
     """Generate streaming speech from text."""
@@ -144,7 +158,7 @@ async def text_to_speech_sync(text: str = Form(...)):
     )
 
 
-WORKERS = int(os.getenv("WORKERS", "1"))
+WORKERS = int(os.getenv("WORKERS", "4"))
 
 if __name__ == "__main__":
     uvicorn.run("server:app", host=HOST, port=PORT, workers=WORKERS, reload=False)
