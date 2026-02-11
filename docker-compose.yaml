@@ -5,7 +5,7 @@ services:
     build: .
     container_name: tts-api
     ports:
-      - "8000:8000"
+      - "80:8000"
     environment:
       - DEVICE=cpu
       - HOST=0.0.0.0
