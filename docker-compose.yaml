@@ -14,6 +14,7 @@ services:
       - TEMPERATURE=0.7
       - LSD_DECODE_STEPS=1
       - WORKERS=4
+      - HF_TOKEN=${HF_TOKEN}
     restart: unless-stopped
     volumes:
       - .:/app
