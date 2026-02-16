@@ -13,6 +13,7 @@ from contextlib import asynccontextmanager
 import scipy.io.wavfile
 import uvicorn
 import psutil
+import torch
 from fastapi import FastAPI, Form, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
@@ -29,6 +30,7 @@ PORT = int(os.getenv("PORT", "8000"))
 TEMPERATURE = float(os.getenv("TEMPERATURE", "0.7"))
 LSD_DECODE_STEPS = int(os.getenv("LSD_DECODE_STEPS", "1"))
 VOICE_PATH = Path(__file__).parent / "homesoul.wav"
+HF_TOKEN = os.getenv("HF_TOKEN")
 
 # ── Global State ───────────────────────────────────────────
 tts_model: TTSModel | None = None
@@ -40,12 +42,38 @@ model_lock = threading.Lock()
 async def lifespan(app: FastAPI):
     """Load model and default voice on startup."""
     global tts_model, default_voice_state
+
+    # OPTIMIZATION: Set Threading for 8-core Instance
+    # We have 8 cores. If we run 4 workers, each should use ~2 threads.
+    # The competitor uses 4 threads, likely because they run 1 worker.
+    # We will use 2 threads to be safe with our 4-worker setup.
+    torch.set_num_threads(2)
+    torch.set_num_interop_threads(1)
+    logger.info(f"PyTorch threads set to: {torch.get_num_threads()}")
+
     logger.info(f"Loading Pocket TTS model on device={DEVICE}...")
+    
+    # Configure HuggingFace access if provided
+    if HF_TOKEN:
+        from huggingface_hub import login
+        logger.info("Logging into Hugging Face...")
+        login(token=HF_TOKEN)
+
     tts_model = TTSModel.load_model(temp=TEMPERATURE, lsd_decode_steps=LSD_DECODE_STEPS)
 
     if DEVICE != "cpu":
         os.environ["NO_CUDA_GRAPH"] = "1"
         tts_model.to(DEVICE)
+    
+    # OPTIMIZATION: Compile the model
+    # This matches the 'reduce-overhead' mode seen in the competitor code.
+    if DEVICE == "cpu":
+        try:
+            logger.info("Compiling model with torch.compile(mode='reduce-overhead')...")
+            tts_model.generate_audio_stream = torch.compile(tts_model.generate_audio_stream, mode="reduce-overhead")
+            logger.info("Model compiled successfully.")
+        except Exception as e:
+            logger.warning(f"Failed to compile model: {e}")
 
     logger.info(f"Loading default voice from {VOICE_PATH}...")
     default_voice_state = tts_model.get_state_for_audio_prompt(VOICE_PATH)
