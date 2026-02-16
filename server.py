@@ -57,18 +57,17 @@ async def lifespan(app: FastAPI):
     if DEVICE != "cpu":
         os.environ["NO_CUDA_GRAPH"] = "1"
         tts_model.to(DEVICE)
-    else:
-        # OPTIMIZATION: Apply CPU optimizations
-        # Level 1: Thread tuning (Safe)
-        # Level 2: Dynamic Quantization (Fastest)
-        try:
-            from optimization import optimize_model
-            opt_level = int(os.getenv("CPU_OPTIMIZATION_LEVEL", "1"))
-            optimize_model(tts_model, level=opt_level)
-        except ImportError:
-            logger.warning("Optimization module not found, skipping optimizations.")
-        except Exception as e:
-            logger.error(f"Error applying optimizations: {e}")
+    
+    # OPTIMIZATION: Compile the model
+    # REVERTED: torch.compile causes high CPU load with dynamic shapes (varying text lengths).
+    # We are keeping it disabled for stability until we can implement static padding.
+    # if DEVICE == "cpu":
+    #     try:
+    #         logger.info("Compiling model with torch.compile(mode='reduce-overhead')...")
+    #         tts_model.generate_audio_stream = torch.compile(tts_model.generate_audio_stream, mode="reduce-overhead")
+    #         logger.info("Model compiled successfully.")
+    #     except Exception as e:
+    #         logger.warning(f"Failed to compile model: {e}")
 
     logger.info(f"Loading default voice from {VOICE_PATH}...")
     default_voice_state = tts_model.get_state_for_audio_prompt(VOICE_PATH)
