@@ -43,14 +43,7 @@ async def lifespan(app: FastAPI):
     """Load model and default voice on startup."""
     global tts_model, default_voice_state
 
-    # OPTIMIZATION: Set Threading for 8-core Instance
-    # We have 8 cores. If we run 4 workers, each should use ~2 threads.
-    # The competitor uses 4 threads, likely because they run 1 worker.
-    # We will use 2 threads to be safe with our 4-worker setup.
-    torch.set_num_threads(2)
-    torch.set_num_interop_threads(1)
-    logger.info(f"PyTorch threads set to: {torch.get_num_threads()}")
-
+    
     logger.info(f"Loading Pocket TTS model on device={DEVICE}...")
     
     # Configure HuggingFace access if provided
