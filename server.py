@@ -66,14 +66,15 @@ async def lifespan(app: FastAPI):
         tts_model.to(DEVICE)
     
     # OPTIMIZATION: Compile the model
-    # This matches the 'reduce-overhead' mode seen in the competitor code.
-    if DEVICE == "cpu":
-        try:
-            logger.info("Compiling model with torch.compile(mode='reduce-overhead')...")
-            tts_model.generate_audio_stream = torch.compile(tts_model.generate_audio_stream, mode="reduce-overhead")
-            logger.info("Model compiled successfully.")
-        except Exception as e:
-            logger.warning(f"Failed to compile model: {e}")
+    # REVERTED: torch.compile causes high CPU load with dynamic shapes (varying text lengths).
+    # We are keeping it disabled for stability until we can implement static padding.
+    # if DEVICE == "cpu":
+    #     try:
+    #         logger.info("Compiling model with torch.compile(mode='reduce-overhead')...")
+    #         tts_model.generate_audio_stream = torch.compile(tts_model.generate_audio_stream, mode="reduce-overhead")
+    #         logger.info("Model compiled successfully.")
+    #     except Exception as e:
+    #         logger.warning(f"Failed to compile model: {e}")
 
     logger.info(f"Loading default voice from {VOICE_PATH}...")
     default_voice_state = tts_model.get_state_for_audio_prompt(VOICE_PATH)
