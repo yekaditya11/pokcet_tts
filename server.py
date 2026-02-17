@@ -10,9 +10,7 @@ from pathlib import Path
 from queue import Queue
 from contextlib import asynccontextmanager
 
-import scipy.io.wavfile
 import uvicorn
-import psutil
 import torch
 from fastapi import FastAPI, Form, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -35,7 +33,6 @@ HF_TOKEN = os.getenv("HF_TOKEN")
 # ── Global State ───────────────────────────────────────────
 tts_model: TTSModel | None = None
 default_voice_state: dict | None = None
-model_lock = threading.Lock()
 
 
 @asynccontextmanager
@@ -126,28 +123,6 @@ def stream_tts(text: str):
 
 
 # ── Endpoints ──────────────────────────────────────────────
-@app.get("/health")
-async def health():
-    return {"status": "healthy", "device": DEVICE}
-
-
-@app.get("/system")
-async def system_info():
-    """Return current system load and memory info."""
-    try:
-        load_1, load_5, load_15 = os.getloadavg()
-        mem = psutil.virtual_memory()
-        return {
-            "load": [round(load_1, 2), round(load_5, 2), round(load_15, 2)],
-            "memory_percent": mem.percent,
-            "memory_used_gb": round(mem.used / (1024**3), 2),
-            "cpu_count": psutil.cpu_count(),
-        }
-    except Exception as e:
-        logger.error(f"Error in /system endpoint: {e}")
-        return {"error": str(e)}
-
-
 @app.post("/tts")
 async def text_to_speech(text: str = Form(...)):
     """Generate streaming speech from text."""
@@ -164,23 +139,19 @@ async def text_to_speech(text: str = Form(...)):
     )
 
 
-@app.post("/tts/sync")
-async def text_to_speech_sync(text: str = Form(...)):
-    """Generate complete audio from text (non-streaming)."""
+@app.get("/tts")
+async def text_to_speech_get(text: str):
+    """Generate streaming speech from text via GET (for React Native/Audio players)."""
     if not text.strip():
         raise HTTPException(status_code=400, detail="Text cannot be empty")
 
-    with model_lock:
-        audio = tts_model.generate_audio(default_voice_state, text)
-
-    buf = io.BytesIO()
-    scipy.io.wavfile.write(buf, tts_model.sample_rate, audio.numpy())
-    buf.seek(0)
-
     return StreamingResponse(
-        buf,
+        stream_tts(text),
         media_type="audio/wav",
-        headers={"Content-Disposition": "attachment; filename=generated_speech.wav"},
+        headers={
+            "Content-Disposition": "inline; filename=generated_speech.wav",
+            "Transfer-Encoding": "chunked",
+        },
     )
 
 
