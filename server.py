@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 # ── Configuration ──────────────────────────────────────────
 DEVICE = os.getenv("DEVICE", "cpu")
 HOST = os.getenv("HOST", "0.0.0.0")
-PORT = int(os.getenv("PORT", "8000"))
+PORT = int(os.getenv("PORT", "80"))
 TEMPERATURE = float(os.getenv("TEMPERATURE", "0.7"))
 LSD_DECODE_STEPS = int(os.getenv("LSD_DECODE_STEPS", "1"))
 VOICE_PATH = Path(__file__).parent / "homesoul.wav"
